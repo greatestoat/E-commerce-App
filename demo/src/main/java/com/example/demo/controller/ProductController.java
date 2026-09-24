@@ -31,7 +31,6 @@ public class ProductController {
         this.jwtUtil = jwtUtil;
     }
 
-    // Returns null if OK, or a ResponseEntity to return immediately if rejected
     private ResponseEntity<?> requireAdmin(String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or malformed Authorization header");
@@ -40,16 +39,18 @@ public class ProductController {
         if (!jwtUtil.validateToken(token)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token");
         }
-        String role = jwtUtil.getRoleFromToken(token);
-        if (!"ADMIN".equals(role)) {
+        if (!"ADMIN".equals(jwtUtil.getRoleFromToken(token))) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Admin access required");
         }
-        return null; // OK
+        return null;
     }
 
-    // Public — anyone can browse products
+    // Public — optional ?category=Fashion filter
     @GetMapping
-    public List<Product> getAllProducts() {
+    public List<Product> getAllProducts(@RequestParam(required = false) String category) {
+        if (category != null && !category.isBlank()) {
+            return productRepository.findByCategoryIgnoreCase(category);
+        }
         return productRepository.findAll();
     }
 
@@ -69,33 +70,53 @@ public class ProductController {
                 .body(resource);
     }
 
+    private String saveImage(MultipartFile file) throws IOException {
+        File dir = new File(uploadDir);
+        if (!dir.exists()) dir.mkdirs();
+        String filename = UUID.randomUUID() + "_" + file.getOriginalFilename();
+        Files.write(Path.of(uploadDir, filename), file.getBytes());
+        return "/api/products/images/" + filename;
+    }
+
     // Admin only — create product
     @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<?> createProduct(
             @RequestHeader("Authorization") String authHeader,
             @RequestParam String name,
-            @RequestParam String description,
+            @RequestParam(required = false) String description,
             @RequestParam Double price,
-            @RequestParam("image") MultipartFile image) throws IOException {
+            @RequestParam(required = false) Double originalPrice,
+            @RequestParam String category,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) Integer stock,
+            @RequestParam(required = false) Double rating,
+            @RequestParam(required = false) String highlights,
+            @RequestParam(required = false) String specifications,
+            @RequestParam("image") MultipartFile image,
+            @RequestParam(value = "images", required = false) List<MultipartFile> images) throws IOException {
 
         ResponseEntity<?> denied = requireAdmin(authHeader);
         if (denied != null) return denied;
-
-        File dir = new File(uploadDir);
-        if (!dir.exists()) dir.mkdirs();
-
-        String filename = UUID.randomUUID() + "_" + image.getOriginalFilename();
-        Path filePath = Path.of(uploadDir, filename);
-        Files.write(filePath, image.getBytes());
 
         Product product = new Product();
         product.setName(name);
         product.setDescription(description);
         product.setPrice(price);
-        product.setImageUrl("/api/products/images/" + filename);
+        product.setOriginalPrice(originalPrice);
+        product.setCategory(category);
+        product.setBrand(brand);
+        product.setStock(stock);
+        product.setRating(rating);
+        product.setHighlights(highlights);
+        product.setSpecifications(specifications);
+        product.setImageUrl(saveImage(image));
 
-        Product saved = productRepository.save(product);
-        return ResponseEntity.ok(saved);
+        if (images != null) {
+            for (MultipartFile f : images) {
+                if (f != null && !f.isEmpty()) product.getImages().add(saveImage(f));
+            }
+        }
+        return ResponseEntity.ok(productRepository.save(product));
     }
 
     // Admin only — delete product
@@ -105,7 +126,6 @@ public class ProductController {
             @PathVariable Long id) {
         ResponseEntity<?> denied = requireAdmin(authHeader);
         if (denied != null) return denied;
-
         productRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }

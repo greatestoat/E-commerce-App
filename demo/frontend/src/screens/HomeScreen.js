@@ -1,199 +1,154 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+  ActivityIndicator, RefreshControl, SafeAreaView, ScrollView, StyleSheet,
+  Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useAuth } from '../../App';
+import { extractErrorMessage } from '../api/auth';
+import { fetchProducts } from '../api/products';
+import ProductCard from '../components/ProductCard';
+import { CATEGORIES, PRIMARY } from '../constants';
 
-const QUICK_LINKS = [
-  { icon: 'bag-handle-outline', label: 'Orders', color: '#3b82f6' },
-  { icon: 'heart-outline', label: 'Wishlist', color: '#ec4899' },
-  { icon: 'star-outline', label: 'Reviews', color: '#f59e0b' },
-  { icon: 'gift-outline', label: 'Offers', color: '#10b981' },
-];
-
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
   const { user } = useAuth();
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState('All');
 
-  const initials = user?.username
-    ? user.username.slice(0, 2).toUpperCase()
-    : '??';
+  const load = useCallback(async () => {
+    try {
+      setError(null);
+      setProducts(await fetchProducts());
+    } catch (e) {
+      setError(extractErrorMessage(e));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const open = (p) => navigation.navigate('ProductDetail', { id: p.id, product: p });
+
+  // only categories that actually have products
+  const categories = useMemo(() => {
+    const present = new Set(products.map((p) => p.category).filter(Boolean));
+    const known = CATEGORIES.map((c) => c.name).filter((n) => present.has(n));
+    const extra = [...present].filter((n) => !known.includes(n));
+    return [...known, ...extra];
+  }, [products]);
+
+  const q = query.trim().toLowerCase();
+  const filtered = products.filter((p) =>
+    (selected === 'All' || p.category === selected) &&
+    (!q || p.name?.toLowerCase().includes(q) || p.brand?.toLowerCase().includes(q)));
+
+  const showSections = selected === 'All' && !q;
 
   return (
     <SafeAreaView style={styles.root}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Top Banner */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={refreshing}
+          onRefresh={() => { setRefreshing(true); load(); }} />}
+      >
         <View style={styles.banner}>
-          <View>
-            <Text style={styles.greeting}>Hello, {user?.username} 👋</Text>
-            <Text style={styles.bannerSub}>Welcome back to ShopApp</Text>
-          </View>
-          <View style={styles.avatarSmall}>
-            <Text style={styles.avatarSmallText}>{initials}</Text>
+          <Text style={styles.greeting}>Hello, {user?.username} 👋</Text>
+          <Text style={styles.bannerSub}>What are you shopping for today?</Text>
+          <View style={styles.searchBar}>
+            <Ionicons name="search-outline" size={18} color="#9ca3af" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search products…"
+              placeholderTextColor="#9ca3af"
+              value={query}
+              onChangeText={setQuery}
+            />
+            {!!query && (
+              <TouchableOpacity onPress={() => setQuery('')}>
+                <Ionicons name="close-circle" size={18} color="#9ca3af" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
-        {/* Search Bar placeholder */}
-        <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={18} color="#9ca3af" />
-          <Text style={styles.searchPlaceholder}>Search products…</Text>
-        </View>
-
-        {/* Quick Links */}
-        <Text style={styles.sectionTitle}>Quick Access</Text>
-        <View style={styles.quickGrid}>
-          {QUICK_LINKS.map(({ icon, label, color }) => (
-            <View key={label} style={styles.quickCard}>
-              <View style={[styles.quickIcon, { backgroundColor: color + '1a' }]}>
-                <Ionicons name={icon} size={24} color={color} />
-              </View>
-              <Text style={styles.quickLabel}>{label}</Text>
-            </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+          {['All', ...categories].map((c) => (
+            <TouchableOpacity key={c} onPress={() => setSelected(c)}
+              style={[styles.chip, selected === c && styles.chipActive]}>
+              <Text style={[styles.chipText, selected === c && styles.chipTextActive]}>{c}</Text>
+            </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
 
-        {/* Featured placeholder */}
-        <Text style={styles.sectionTitle}>Featured</Text>
-        <View style={styles.featuredCard}>
-          <Ionicons name="flash-outline" size={32} color="#2f6fed" />
-          <View style={{ flex: 1, marginLeft: 14 }}>
-            <Text style={styles.featuredTitle}>Flash Sale — Up to 50% Off</Text>
-            <Text style={styles.featuredSub}>Limited time deals just for you</Text>
+        {loading && <ActivityIndicator style={{ marginTop: 40 }} size="large" color={PRIMARY} />}
+        {error && <Text style={styles.error}>{error}</Text>}
+
+        {!loading && showSections && categories.map((cat) => (
+          <View key={cat} style={{ marginBottom: 8 }}>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTitle}>{cat}</Text>
+              <TouchableOpacity onPress={() => setSelected(cat)}>
+                <Text style={styles.seeAll}>See all</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 12, gap: 12, paddingBottom: 6 }}>
+              {products.filter((p) => p.category === cat).map((p) => (
+                <ProductCard key={p.id} product={p} style={{ width: 160 }} onPress={() => open(p)} />
+              ))}
+            </ScrollView>
           </View>
-        </View>
+        ))}
 
-        {/* Activity placeholder */}
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
-        <View style={styles.emptyCard}>
-          <Ionicons name="receipt-outline" size={40} color="#d1d5db" />
-          <Text style={styles.emptyText}>No orders yet</Text>
-          <Text style={styles.emptySubText}>Start shopping to see your orders here</Text>
-        </View>
+        {!loading && !showSections && (
+          <View style={styles.grid}>
+            {filtered.map((p) => (
+              <ProductCard key={p.id} product={p} style={styles.gridItem} onPress={() => open(p)} />
+            ))}
+          </View>
+        )}
 
-        <View style={{ height: 20 }} />
+        {!loading && !error && (showSections ? products.length === 0 : filtered.length === 0) && (
+          <View style={styles.empty}>
+            <Ionicons name="cube-outline" size={44} color="#d1d5db" />
+            <Text style={styles.emptyText}>{products.length === 0 ? 'No products yet' : 'No products found'}</Text>
+          </View>
+        )}
+        <View style={{ height: 24 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const PRIMARY = '#2f6fed';
-
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#f0f4ff' },
-
-  // Banner
-  banner: {
-    backgroundColor: PRIMARY,
-    padding: 24,
-    paddingTop: 32,
-    paddingBottom: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
+  banner: { backgroundColor: PRIMARY, padding: 20, paddingTop: 32,
+    borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   greeting: { fontSize: 22, fontWeight: '800', color: '#fff' },
-  bannerSub: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
-  avatarSmall: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.5)',
-  },
-  avatarSmallText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-
-  // Search
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    margin: 16,
-    borderRadius: 14,
-    padding: 12,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  searchPlaceholder: { color: '#9ca3af', fontSize: 14 },
-
-  // Sections
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1e3a5f',
-    marginHorizontal: 16,
-    marginBottom: 10,
-    marginTop: 4,
-  },
-
-  // Quick grid
-  quickGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 12,
-    marginBottom: 20,
-    gap: 8,
-  },
-  quickCard: {
-    width: '22%',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  quickIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  quickLabel: { fontSize: 11, fontWeight: '600', color: '#374151', textAlign: 'center' },
-
-  // Featured
-  featuredCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#eff6ff',
-    marginHorizontal: 16,
-    marginBottom: 20,
-    padding: 18,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-  },
-  featuredTitle: { fontSize: 15, fontWeight: '700', color: '#1e40af' },
-  featuredSub: { fontSize: 12, color: '#3b82f6', marginTop: 3 },
-
-  // Empty state
-  emptyCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 32,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  emptyText: { fontSize: 15, fontWeight: '600', color: '#6b7280', marginTop: 12 },
-  emptySubText: { fontSize: 12, color: '#9ca3af', marginTop: 4, textAlign: 'center' },
+  bannerSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
+    borderRadius: 14, paddingHorizontal: 12, marginTop: 16, gap: 8 },
+  searchInput: { flex: 1, paddingVertical: 11, fontSize: 14, outlineStyle: 'none' },
+  chips: { paddingHorizontal: 12, paddingVertical: 14, gap: 8 },
+  chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#fff',
+    borderWidth: 1, borderColor: '#e5e7eb' },
+  chipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  chipText: { color: '#374151', fontWeight: '600', fontSize: 13 },
+  chipTextActive: { color: '#fff' },
+  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginHorizontal: 16, marginBottom: 10, marginTop: 4 },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: '#1e3a5f' },
+  seeAll: { color: PRIMARY, fontWeight: '600', fontSize: 13 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 12 },
+  gridItem: { width: '47.5%' },
+  empty: { alignItems: 'center', marginTop: 50 },
+  emptyText: { color: '#9ca3af', marginTop: 8, fontWeight: '600' },
+  error: { color: 'red', textAlign: 'center', padding: 8 },
 });

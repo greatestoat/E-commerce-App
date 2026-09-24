@@ -1,8 +1,8 @@
 import { Platform } from 'react-native';
 import { api } from './client';
 
-export async function fetchProducts() {
-  const { data } = await api.get('/products');
+export async function fetchProducts(category) {
+  const { data } = await api.get('/products', { params: category ? { category } : {} });
   return data;
 }
 
@@ -11,30 +11,28 @@ export async function fetchProduct(id) {
   return data;
 }
 
-// image: the asset object from expo-image-picker ({ uri, fileName, mimeType })
-export async function createProduct({ name, description, price, image }) {
-  const formData = new FormData();
-  formData.append('name', name);
-  formData.append('description', description);
-  formData.append('price', String(price));
-
+async function appendFile(formData, field, asset) {
+  const name = asset.fileName || `photo_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.jpg`;
   if (Platform.OS === 'web') {
-    // On web, `image.uri` is a blob: URL — fetch it to get a real Blob/File
-    const response = await fetch(image.uri);
-    const blob = await response.blob();
-    formData.append('image', blob, image.fileName || `photo_${Date.now()}.jpg`);
+    const blob = await (await fetch(asset.uri)).blob();
+    formData.append(field, blob, name);
   } else {
-    // Native (Android/iOS) — RN's fetch polyfill understands this shape directly
-    formData.append('image', {
-      uri: image.uri,
-      name: image.fileName || `photo_${Date.now()}.jpg`,
-      type: image.mimeType || 'image/jpeg',
-    });
+    formData.append(field, { uri: asset.uri, name, type: asset.mimeType || 'image/jpeg' });
   }
+}
+
+// image: main asset; gallery: array of extra assets
+export async function createProduct({ image, gallery = [], ...fields }) {
+  const formData = new FormData();
+  Object.entries(fields).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && String(v).trim() !== '') formData.append(k, String(v));
+  });
+  await appendFile(formData, 'image', image);
+  for (const g of gallery) await appendFile(formData, 'images', g);
 
   const { data } = await api.post('/products', formData, {
-    // Let the browser/RN set Content-Type + boundary itself — don't hardcode it
     headers: { 'Content-Type': undefined },
+    timeout: 60000,
   });
   return data;
 }

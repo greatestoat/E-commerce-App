@@ -14,6 +14,7 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import ProductListScreen from './src/screens/ProductListScreen';
 import AdminUploadScreen from './src/screens/AdminUploadScreen';
+import ProductDetailScreen from './src/screens/ProductDetailScreen';
 
 const TOKEN_KEY = 'auth_token';
 
@@ -111,7 +112,20 @@ export default function App() {
     <AuthContext.Provider value={{ user, handleAuthSuccess, handleLogout }}>
       <NavigationContainer>
         <StatusBar style="auto" />
-        {user ? <MainTabs user={user} /> : <AuthStack />}
+        {user ? (
+          <Stack.Navigator>
+            <Stack.Screen name="MainTabs" options={{ headerShown: false }}>
+              {() => <MainTabs user={user} />}
+            </Stack.Screen>
+            <Stack.Screen
+              name="ProductDetail"
+              component={ProductDetailScreen}
+              options={{ title: 'Product details' }}
+            />
+          </Stack.Navigator>
+        ) : (
+          <AuthStack />
+        )}
       </NavigationContainer>
     </AuthContext.Provider>
   );

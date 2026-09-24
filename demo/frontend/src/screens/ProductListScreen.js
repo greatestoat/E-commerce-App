@@ -1,12 +1,9 @@
-import React, { useCallback, useState } from 'react';
-import {
-  View, Text, FlatList, Image, StyleSheet,
-  ActivityIndicator, RefreshControl, TouchableOpacity,
-} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { fetchProducts } from '../api/products';
-import { HOST } from '../api/client';
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { extractErrorMessage } from '../api/auth';
+import { fetchProducts } from '../api/products';
+import ProductCard from '../components/ProductCard';
 
 export default function ProductListScreen({ navigation }) {
   const [products, setProducts] = useState([]);
@@ -17,8 +14,7 @@ export default function ProductListScreen({ navigation }) {
   const load = useCallback(async () => {
     try {
       setError(null);
-      const data = await fetchProducts();
-      setProducts(data);
+      setProducts(await fetchProducts());
     } catch (e) {
       setError(extractErrorMessage(e));
     } finally {
@@ -26,40 +22,26 @@ export default function ProductListScreen({ navigation }) {
       setRefreshing(false);
     }
   }, []);
-
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    load();
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" /></View>;
 
   return (
     <View style={styles.container}>
       {error && <Text style={styles.error}>{error}</Text>}
       <FlatList
         data={products}
-        keyExtractor={(item) => String(item.id)}
+        keyExtractor={(i) => String(i.id)}
         numColumns={2}
+        columnWrapperStyle={{ gap: 12 }}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
         renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() => navigation.navigate('ProductDetail', { product: item })}
-          >
-            <Image source={{ uri: `${HOST}${item.imageUrl}` }} style={styles.image} />
-            <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
-            <Text style={styles.price}>₹{item.price}</Text>
-          </TouchableOpacity>
+          <ProductCard
+            product={item}
+            style={{ flex: 1, maxWidth: '48%', marginBottom: 12 }}
+            onPress={() => navigation.navigate('ProductDetail', { id: item.id, product: item })}
+          />
         )}
         ListEmptyComponent={<Text style={styles.empty}>No products yet.</Text>}
       />
@@ -68,16 +50,9 @@ export default function ProductListScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: '#f0f4ff' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  list: { padding: 8 },
-  card: {
-    flex: 1, margin: 6, backgroundColor: '#f7f7f7', borderRadius: 10,
-    padding: 8, maxWidth: '47%',
-  },
-  image: { width: '100%', height: 130, borderRadius: 8, backgroundColor: '#e0e0e0' },
-  name: { marginTop: 6, fontWeight: '600' },
-  price: { marginTop: 2, color: '#444' },
+  list: { padding: 12 },
   empty: { textAlign: 'center', marginTop: 40, color: '#888' },
   error: { color: 'red', textAlign: 'center', padding: 8 },
 });
