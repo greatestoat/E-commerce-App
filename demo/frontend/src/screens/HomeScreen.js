@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import {
   ActivityIndicator, Dimensions, Image, RefreshControl, SafeAreaView, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
@@ -10,7 +10,7 @@ import { extractErrorMessage } from '../api/auth';
 import { fetchBanners, fetchProducts } from '../api/products';
 import { HOST } from '../api/client';
 import ProductCard from '../components/ProductCard';
-import { CATEGORIES, PRIMARY } from '../constants';
+import { PRIMARY } from '../constants';
 
 export default function HomeScreen({ navigation, route }) {
   const { user } = useAuth();
@@ -19,9 +19,9 @@ export default function HomeScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState('All');
   const [banners, setBanners] = useState([]);
   const [showOrderSuccess, setShowOrderSuccess] = useState(false);
+  const [activeBanner, setActiveBanner] = useState(0);
   const carousel = useRef(null);
   const bannerIndex = useRef(0);
   const screenWidth = Dimensions.get('window').width;
@@ -49,6 +49,7 @@ export default function HomeScreen({ navigation, route }) {
     if (banners.length < 2) return undefined;
     const timer = setInterval(() => {
       bannerIndex.current = (bannerIndex.current + 1) % banners.length;
+      setActiveBanner(bannerIndex.current);
       carousel.current?.scrollTo({ x: bannerIndex.current * (screenWidth - 32), animated: true });
     }, 4000);
     return () => clearInterval(timer);
@@ -56,20 +57,9 @@ export default function HomeScreen({ navigation, route }) {
 
   const open = (p) => navigation.navigate('ProductDetail', { id: p.id, product: p });
 
-  // only categories that actually have products
-  const categories = useMemo(() => {
-    const present = new Set(products.map((p) => p.category).filter(Boolean));
-    const known = CATEGORIES.map((c) => c.name).filter((n) => present.has(n));
-    const extra = [...present].filter((n) => !known.includes(n));
-    return [...known, ...extra];
-  }, [products]);
-
   const q = query.trim().toLowerCase();
   const filtered = products.filter((p) =>
-    (selected === 'All' || p.category === selected) &&
-    (!q || p.name?.toLowerCase().includes(q) || p.brand?.toLowerCase().includes(q)));
-
-  const showSections = selected === 'All' && !q;
+    !q || p.name?.toLowerCase().includes(q) || p.brand?.toLowerCase().includes(q));
 
   return (
     <SafeAreaView style={styles.root}>
@@ -112,7 +102,10 @@ export default function HomeScreen({ navigation, route }) {
 
         {banners.length > 0 && <View style={styles.carouselWrap}>
           <ScrollView ref={carousel} horizontal pagingEnabled showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={(e) => { bannerIndex.current = Math.round(e.nativeEvent.contentOffset.x / (screenWidth - 32)); }}>
+            onMomentumScrollEnd={(e) => {
+              bannerIndex.current = Math.round(e.nativeEvent.contentOffset.x / (screenWidth - 32));
+              setActiveBanner(bannerIndex.current);
+            }}>
             {banners.map((item) => <Image key={item.id} source={{ uri: `${HOST}${item.imageUrl}` }}
               style={[styles.bannerImage, { width: screenWidth - 32 }]} resizeMode="cover" />)}
           </ScrollView>
@@ -120,36 +113,15 @@ export default function HomeScreen({ navigation, route }) {
             <View key={b.id} style={[styles.bannerDot, i === activeBanner && styles.bannerDotActive]} />)}</View>}
         </View>}
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {['All', ...categories].map((c) => (
-            <TouchableOpacity key={c} onPress={() => setSelected(c)}
-              style={[styles.chip, selected === c && styles.chipActive]}>
-              <Text style={[styles.chipText, selected === c && styles.chipTextActive]}>{c}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
         {loading && <ActivityIndicator style={{ marginTop: 40 }} size="large" color={PRIMARY} />}
         {error && <Text style={styles.error}>{error}</Text>}
 
-        {!loading && showSections && categories.map((cat) => (
-          <View key={cat} style={{ marginBottom: 8 }}>
-            <View style={styles.sectionHead}>
-              <Text style={styles.sectionTitle}>{cat}</Text>
-              <TouchableOpacity onPress={() => setSelected(cat)}>
-                <Text style={styles.seeAll}>See all</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 12, gap: 12, paddingBottom: 6 }}>
-              {products.filter((p) => p.category === cat).map((p) => (
-                <ProductCard key={p.id} product={p} style={{ width: 160 }} onPress={() => open(p)} />
-              ))}
-            </ScrollView>
-          </View>
-        ))}
+        {!loading && <View style={styles.sectionHead}>
+          <View><Text style={styles.sectionTitle}>{q ? 'Search results' : 'Discover products'}</Text>
+            <Text style={styles.sectionCaption}>{q ? `${filtered.length} matches` : 'Find something you’ll love'}</Text></View>
+        </View>}
 
-        {!loading && !showSections && (
+        {!loading && (
           <View style={styles.grid}>
             {filtered.map((p) => (
               <ProductCard key={p.id} product={p} style={styles.gridItem} onPress={() => open(p)} />
@@ -157,7 +129,7 @@ export default function HomeScreen({ navigation, route }) {
           </View>
         )}
 
-        {!loading && !error && (showSections ? products.length === 0 : filtered.length === 0) && (
+        {!loading && !error && filtered.length === 0 && (
           <View style={styles.empty}>
             <Ionicons name="cube-outline" size={44} color="#d1d5db" />
             <Text style={styles.emptyText}>{products.length === 0 ? 'No products yet' : 'No products found'}</Text>
@@ -191,16 +163,10 @@ const styles = StyleSheet.create({
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
     borderRadius: 14, paddingHorizontal: 12, marginTop: 16, gap: 8 },
   searchInput: { flex: 1, paddingVertical: 11, fontSize: 14, outlineStyle: 'none' },
-  chips: { paddingHorizontal: 12, paddingVertical: 14, gap: 8 },
-  chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#fff',
-    borderWidth: 1, borderColor: '#e5e7eb' },
-  chipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  chipText: { color: '#374151', fontWeight: '600', fontSize: 13 },
-  chipTextActive: { color: '#fff' },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginHorizontal: 16, marginBottom: 10, marginTop: 4 },
+    marginHorizontal: 16, marginBottom: 10, marginTop: 16 },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: '#1e3a5f' },
-  seeAll: { color: PRIMARY, fontWeight: '600', fontSize: 13 },
+  sectionCaption: { color: '#8a97ab', fontSize: 12, marginTop: 3 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 12 },
   gridItem: { width: '47.5%' },
   empty: { alignItems: 'center', marginTop: 50 },

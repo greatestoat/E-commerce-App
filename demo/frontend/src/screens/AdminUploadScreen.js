@@ -25,7 +25,7 @@ export default function AdminUploadScreen({ navigation }) {
   const [products, setProducts] = useState([]);
   const [banners, setBanners] = useState([]);
   const [editing, setEditing] = useState(null);
-  const [bannerImage, setBannerImage] = useState(null);
+  const [bannerImages, setBannerImages] = useState([]);
 
   const loadAdminData = useCallback(async () => {
     try { setProducts(await fetchProducts()); setBanners(await fetchBanners()); } catch { /* keep current form usable */ }
@@ -83,8 +83,8 @@ export default function AdminUploadScreen({ navigation }) {
   const pickBanner = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return Alert.alert('Permission needed', 'Allow photo access to pick images.');
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
-    if (!res.canceled) setBannerImage(res.assets[0]);
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8, allowsMultipleSelection: true, selectionLimit: 0 });
+    if (!res.canceled) setBannerImages((current) => [...current, ...res.assets]);
   };
 
   const editProduct = (p) => {
@@ -98,8 +98,11 @@ export default function AdminUploadScreen({ navigation }) {
   };
 
   const uploadBanner = async () => {
-    if (!bannerImage) return Alert.alert('Choose an image', 'Select a banner image first.');
-    try { await createBanner(bannerImage); setBannerImage(null); await loadAdminData(); Alert.alert('Banner added', 'It will rotate on the home page.'); }
+    if (!bannerImages.length) return Alert.alert('Choose images', 'Select one or more banner images first.');
+    try {
+      for (const banner of bannerImages) await createBanner(banner);
+      setBannerImages([]); await loadAdminData(); Alert.alert('Banners added', 'They will rotate on the home page.');
+    }
     catch (e) { Alert.alert('Upload failed', extractErrorMessage(e)); }
   };
 
@@ -188,13 +191,18 @@ export default function AdminUploadScreen({ navigation }) {
 
       <View style={styles.bannerAdmin}>
         <Text style={styles.sectionTitle}>Home page banners</Text>
-        <Text style={styles.helper}>Add wide images to create an automatic rotating carousel.</Text>
+        <Text style={styles.helper}>Select multiple wide images at once. They’ll rotate on the home page.</Text>
         <TouchableOpacity style={styles.pickBtn} onPress={pickBanner}>
-          <Text style={styles.pickText}>{bannerImage ? 'Choose a different banner' : 'Choose banner image'}</Text>
+          <Text style={styles.pickText}>{bannerImages.length ? 'Add more banner images' : 'Choose banner images'}</Text>
         </TouchableOpacity>
-        {bannerImage && <Image source={{ uri: bannerImage.uri }} style={styles.bannerPreview} />}
+        {bannerImages.length > 0 && <View style={styles.bannerPreviews}>{bannerImages.map((banner, index) => <View key={`${banner.uri}-${index}`} style={styles.pendingBanner}>
+          <Image source={{ uri: banner.uri }} style={styles.bannerPreview} />
+          <TouchableOpacity style={styles.removeBanner} onPress={() => setBannerImages((list) => list.filter((_, i) => i !== index))}>
+            <Text style={styles.removeBannerText}>×</Text>
+          </TouchableOpacity>
+        </View>)}</View>}
         <TouchableOpacity style={[styles.smallBtn, { alignSelf: 'flex-start', marginTop: 8 }]} onPress={uploadBanner}>
-          <Text style={styles.smallBtnText}>Upload banner</Text>
+          <Text style={styles.smallBtnText}>Upload {bannerImages.length || ''} {bannerImages.length === 1 ? 'banner' : 'banners'}</Text>
         </TouchableOpacity>
         <View style={styles.bannerList}>{banners.map((b) => <View key={b.id} style={styles.bannerItem}>
           <Text style={[styles.helper, { flex: 1 }]}>Banner #{b.id}</Text>
@@ -218,7 +226,11 @@ const styles = StyleSheet.create({
   deleteBtn: { padding: 7 }, deleteText: { color: '#dc2626', fontWeight: '600', fontSize: 12 },
   cancelEdit: { color: PRIMARY, fontWeight: '600', marginBottom: 6 },
   bannerAdmin: { marginTop: 24, padding: 14, borderRadius: 16, backgroundColor: '#fff' },
-  bannerPreview: { height: 130, borderRadius: 12, marginTop: 10 },
+  bannerPreviews: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  pendingBanner: { width: '48%', position: 'relative' },
+  bannerPreview: { width: '100%', height: 92, borderRadius: 12 },
+  removeBanner: { position: 'absolute', right: 5, top: 5, width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(15,23,42,.75)', alignItems: 'center', justifyContent: 'center' },
+  removeBannerText: { color: '#fff', fontWeight: '800', fontSize: 18, lineHeight: 20 },
   bannerList: { marginTop: 12 }, bannerItem: { flexDirection: 'row', paddingVertical: 8, borderTopWidth: 1, borderColor: '#edf0f5' },
   label: { marginTop: 14, marginBottom: 4, fontWeight: '600', color: '#374151' },
   input: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 10, backgroundColor: '#fff' },

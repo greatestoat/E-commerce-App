@@ -16,6 +16,7 @@ import AdminUploadScreen from './src/screens/AdminUploadScreen';
 import ProductDetailScreen from './src/screens/ProductDetailScreen';
 import AccountDataScreen from './src/screens/AccountDataScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
+import CategoriesScreen from './src/screens/CategoriesScreen';
 
 const TOKEN_KEY = 'auth_token';
 
@@ -51,6 +52,7 @@ function MainTabs({ user }) {
         tabBarIcon: ({ focused, color, size }) => {
           const icons = {
             Home: focused ? 'home' : 'home-outline',
+            Categories: focused ? 'grid' : 'grid-outline',
             Admin: focused ? 'add-circle' : 'add-circle-outline',
             Profile: focused ? 'person-circle' : 'person-circle-outline',
           };
@@ -59,6 +61,7 @@ function MainTabs({ user }) {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Categories" component={CategoriesScreen} />
       {isAdmin && <Tab.Screen name="Admin" component={AdminUploadScreen} />}
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
