@@ -10,7 +10,17 @@ import { extractErrorMessage } from '../api/auth';
 import { fetchBanners, fetchProducts } from '../api/products';
 import { HOST } from '../api/client';
 import ProductCard from '../components/ProductCard';
-import { PRIMARY } from '../constants';
+
+// ---- Porcelain & Jade palette -------------------------------------------
+// Drop these into your constants file and swap PRIMARY for JADE app-wide
+// if you want the theme to carry through the rest of the app.
+const PORCELAIN = '#FBFAF8';
+const SAGE = '#EAF2EC';
+const JADE = '#4F8368';
+const JADE_DARK = '#233028';
+const BLUSH = '#F7C9C0';
+const BLUSH_DARK = '#7A3B31';
+const MUTED = '#A4B3AC';
 
 export default function HomeScreen({ navigation, route }) {
   const { user } = useAuth();
@@ -66,37 +76,47 @@ export default function HomeScreen({ navigation, route }) {
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing}
+        refreshControl={<RefreshControl refreshing={refreshing} tintColor={JADE}
           onRefresh={() => { setRefreshing(true); load(); }} />}
       >
-        <View style={styles.banner}>
+        <View style={styles.hero}>
+          <View style={styles.topbar}>
+            <Text style={styles.brand}>Porcelain</Text>
+            <TouchableOpacity style={styles.iconbtn}>
+              <Ionicons name="notifications-outline" size={17} color={JADE_DARK} />
+            </TouchableOpacity>
+          </View>
+
           <Text style={styles.greeting}>Hello, {user?.username} 👋</Text>
-          <Text style={styles.bannerSub}>What are you shopping for today?</Text>
+          <Text style={styles.heroTitle}>Calm, considered,{'\n'}
+            <Text style={styles.heroTitleAccent}>curated for you.</Text>
+          </Text>
+
           <View style={styles.searchBar}>
-            <Ionicons name="search-outline" size={18} color="#9ca3af" />
+            <Ionicons name="search-outline" size={18} color={MUTED} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search products…"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={MUTED}
               value={query}
               onChangeText={setQuery}
             />
             {!!query && (
               <TouchableOpacity onPress={() => setQuery('')}>
-                <Ionicons name="close-circle" size={18} color="#9ca3af" />
+                <Ionicons name="close-circle" size={18} color={MUTED} />
               </TouchableOpacity>
             )}
           </View>
         </View>
 
         {showOrderSuccess && <View style={styles.successCard}>
-          <View style={styles.successIcon}><Ionicons name="checkmark" size={20} color="#fff" /></View>
+          <View style={styles.successIcon}><Ionicons name="checkmark" size={18} color="#fff" /></View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.successTitle}>Order successfully placed!</Text>
+            <Text style={styles.successTitle}>Order placed — nice pick!</Text>
             <Text style={styles.successSub}>Thanks for shopping with us.</Text>
           </View>
           <TouchableOpacity onPress={() => setShowOrderSuccess(false)} style={styles.continueBtn}>
-            <Text style={styles.continueText}>Continue shopping</Text>
+            <Text style={styles.continueText}>Continue</Text>
           </TouchableOpacity>
         </View>}
 
@@ -113,12 +133,15 @@ export default function HomeScreen({ navigation, route }) {
             <View key={b.id} style={[styles.bannerDot, i === activeBanner && styles.bannerDotActive]} />)}</View>}
         </View>}
 
-        {loading && <ActivityIndicator style={{ marginTop: 40 }} size="large" color={PRIMARY} />}
+        {loading && <ActivityIndicator style={{ marginTop: 40 }} size="large" color={JADE} />}
         {error && <Text style={styles.error}>{error}</Text>}
 
         {!loading && <View style={styles.sectionHead}>
-          <View><Text style={styles.sectionTitle}>{q ? 'Search results' : 'Discover products'}</Text>
-            <Text style={styles.sectionCaption}>{q ? `${filtered.length} matches` : 'Find something you’ll love'}</Text></View>
+          <View>
+            <Text style={styles.sectionTitle}>{q ? 'Search results' : "Today's edit"}</Text>
+            <Text style={styles.sectionCaption}>{q ? `${filtered.length} matches` : 'Find something you’ll love'}</Text>
+          </View>
+          {!q && <Text style={styles.seeAll}>See all</Text>}
         </View>}
 
         {!loading && (
@@ -131,7 +154,7 @@ export default function HomeScreen({ navigation, route }) {
 
         {!loading && !error && filtered.length === 0 && (
           <View style={styles.empty}>
-            <Ionicons name="cube-outline" size={44} color="#d1d5db" />
+            <Ionicons name="cube-outline" size={44} color={MUTED} />
             <Text style={styles.emptyText}>{products.length === 0 ? 'No products yet' : 'No products found'}</Text>
           </View>
         )}
@@ -142,34 +165,70 @@ export default function HomeScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f0f4ff' },
-  carouselWrap: { marginHorizontal: 16, marginTop: 2, marginBottom: 4, overflow: 'hidden', borderRadius: 18,
-    backgroundColor: '#dbeafe', elevation: 3 },
-  successCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 14,
-    padding: 12, borderRadius: 16, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#bbf7d0' },
-  successIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#16a34a', alignItems: 'center', justifyContent: 'center' },
-  successTitle: { color: '#166534', fontWeight: '800', fontSize: 14 },
-  successSub: { color: '#4b7b5b', fontSize: 12, marginTop: 2 },
-  continueBtn: { backgroundColor: '#16a34a', borderRadius: 9, paddingHorizontal: 11, paddingVertical: 9 },
+  root: { flex: 1, backgroundColor: PORCELAIN },
+
+  // ---- hero ----
+  hero: {
+    backgroundColor: SAGE,
+    paddingHorizontal: 20, paddingTop: 20, paddingBottom: 26,
+    borderBottomLeftRadius: 28, borderBottomRightRadius: 28,
+  },
+  topbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  brand: { fontSize: 13, fontWeight: '700', color: JADE_DARK, letterSpacing: 0.4 },
+  iconbtn: {
+    width: 34, height: 34, borderRadius: 12, backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: JADE_DARK, shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2,
+  },
+  greeting: { fontSize: 13, color: MUTED, marginTop: 18, fontWeight: '500' },
+  heroTitle: { fontSize: 25, fontWeight: '600', color: JADE_DARK, marginTop: 6, lineHeight: 32 },
+  heroTitleAccent: { color: JADE, fontWeight: '700' },
+
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
+    borderRadius: 16, paddingHorizontal: 14, marginTop: 20, gap: 9,
+    shadowColor: JADE_DARK, shadowOpacity: 0.06, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 2,
+  },
+  searchInput: { flex: 1, paddingVertical: 12, fontSize: 14, color: JADE_DARK, outlineStyle: 'none' },
+
+  // ---- order success ----
+  successCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 14,
+    padding: 12, borderRadius: 18, backgroundColor: '#fff',
+    shadowColor: JADE_DARK, shadowOpacity: 0.06, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 2,
+  },
+  successIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: JADE, alignItems: 'center', justifyContent: 'center' },
+  successTitle: { color: JADE_DARK, fontWeight: '700', fontSize: 13.5 },
+  successSub: { color: MUTED, fontSize: 11.5, marginTop: 2 },
+  continueBtn: { backgroundColor: JADE, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
   continueText: { color: '#fff', fontWeight: '700', fontSize: 11 },
-  bannerImage: { height: 170, borderRadius: 18 },
+
+  // ---- banner carousel ----
+  carouselWrap: {
+    marginHorizontal: 16, marginTop: 16, marginBottom: 4, overflow: 'hidden', borderRadius: 20,
+    backgroundColor: SAGE,
+    shadowColor: JADE_DARK, shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 3,
+  },
+  bannerImage: { height: 160, borderRadius: 20 },
   bannerDots: { position: 'absolute', bottom: 10, alignSelf: 'center', flexDirection: 'row', gap: 6 },
-  bannerDot: { width: 7, height: 7, borderRadius: 5, backgroundColor: 'rgba(255,255,255,.65)' },
-  bannerDotActive: { width: 18, backgroundColor: '#fff' },
-  banner: { backgroundColor: PRIMARY, padding: 20, paddingTop: 32,
-    borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
-  greeting: { fontSize: 22, fontWeight: '800', color: '#fff' },
-  bannerSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
-  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
-    borderRadius: 14, paddingHorizontal: 12, marginTop: 16, gap: 8 },
-  searchInput: { flex: 1, paddingVertical: 11, fontSize: 14, outlineStyle: 'none' },
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginHorizontal: 16, marginBottom: 10, marginTop: 16 },
-  sectionTitle: { fontSize: 17, fontWeight: '700', color: '#1e3a5f' },
-  sectionCaption: { color: '#8a97ab', fontSize: 12, marginTop: 3 },
+  bannerDot: { width: 6, height: 6, borderRadius: 4, backgroundColor: 'rgba(255,255,255,.6)' },
+  bannerDotActive: { width: 16, backgroundColor: '#fff' },
+
+  // ---- section head ----
+  sectionHead: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginHorizontal: 16, marginBottom: 12, marginTop: 20,
+  },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: JADE_DARK },
+  sectionCaption: { color: MUTED, fontSize: 12, marginTop: 3 },
+  seeAll: { fontSize: 12.5, fontWeight: '700', color: JADE },
+
+  // ---- grid ----
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 12 },
   gridItem: { width: '47.5%' },
+
+  // ---- empty / error ----
   empty: { alignItems: 'center', marginTop: 50 },
-  emptyText: { color: '#9ca3af', marginTop: 8, fontWeight: '600' },
-  error: { color: 'red', textAlign: 'center', padding: 8 },
+  emptyText: { color: MUTED, marginTop: 8, fontWeight: '600' },
+  error: { color: BLUSH_DARK, textAlign: 'center', padding: 8, fontWeight: '600' },
 });
