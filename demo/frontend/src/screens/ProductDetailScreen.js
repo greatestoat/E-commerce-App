@@ -7,20 +7,28 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HOST } from '../api/client';
 import { fetchProduct } from '../api/products';
+import { readAccount, writeAccount } from '../api/products';
 import { PRIMARY, discountPercent } from '../constants';
 
 const lines = (t) => (t || '').split('\n').map((s) => s.trim()).filter(Boolean);
 
-export default function ProductDetailScreen({ route }) {
+export default function ProductDetailScreen({ route, navigation }) {
   const { id, product: initial } = route.params;
   const [product, setProduct] = useState(initial || null);
   const [error, setError] = useState(null);
   const [index, setIndex] = useState(0);
+  const [wishlisted, setWishlisted] = useState(false);
+  const [working, setWorking] = useState(false);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
     fetchProduct(id).then(setProduct).catch(() => { if (!initial) setError('Could not load product'); });
+  }, [id]);
+
+  useEffect(() => {
+    readAccount('wishlist').then((items) => setWishlisted(items.some((x) => x.productId === Number(id))))
+      .catch(() => {});
   }, [id]);
 
   if (!product) {
@@ -35,7 +43,37 @@ export default function ProductDetailScreen({ route }) {
     const i = l.indexOf(':');
     return i > 0 ? [l.slice(0, i).trim(), l.slice(i + 1).trim()] : [l, ''];
   });
-  const notYet = (what) => Alert.alert(what, 'Cart & checkout coming soon.');
+  const addToCart = async () => {
+    setWorking(true);
+    try {
+      const cart = await readAccount('cart');
+      const existing = cart.find((x) => x.productId === product.id);
+      const next = existing ? cart.map((x) => x.productId === product.id ? { ...x, quantity: (x.quantity || 1) + 1 } : x) : [...cart, { productId: product.id, quantity: 1 }];
+      await writeAccount('cart', next);
+      Alert.alert('Added to cart', `${product.name} is in your cart.`);
+    } catch (e) { Alert.alert('Could not add to cart', e.response?.data || e.message); }
+    finally { setWorking(false); }
+  };
+  const toggleWishlist = async () => {
+    setWorking(true);
+    try {
+      const list = await readAccount('wishlist');
+      const exists = list.some((x) => x.productId === product.id);
+      await writeAccount('wishlist', exists ? list.filter((x) => x.productId !== product.id) : [...list, { productId: product.id }]);
+      setWishlisted(!exists);
+    } catch (e) { Alert.alert('Could not update wishlist', e.response?.data || e.message); }
+    finally { setWorking(false); }
+  };
+  const buyNow = async () => {
+    setWorking(true);
+    try {
+      const addresses = await readAccount('addresses');
+      if (!addresses.length) return navigation.navigate('AccountData', { section: 'addresses', checkoutProduct: product });
+      const selectedAddress = addresses.find((x) => x.isDefault) || addresses[0];
+      navigation.navigate('Checkout', { items: [{ product, productId: product.id, quantity: 1 }], address: selectedAddress, fromCart: false });
+    } catch (e) { Alert.alert('Could not start checkout', e.response?.data || e.message); }
+    finally { setWorking(false); }
+  };
 
   return (
     <View style={styles.root}>
@@ -59,6 +97,10 @@ export default function ProductDetailScreen({ route }) {
         )}
 
         <View style={styles.section}>
+          <TouchableOpacity style={styles.wishlist} onPress={toggleWishlist} disabled={working}>
+            <Ionicons name={wishlisted ? 'heart' : 'heart-outline'} size={22} color={wishlisted ? '#e11d48' : PRIMARY} />
+            <Text style={[styles.wishlistText, wishlisted && { color: '#e11d48' }]}>{wishlisted ? 'Saved to wishlist' : 'Add to wishlist'}</Text>
+          </TouchableOpacity>
           {!!product.brand && <Text style={styles.brand}>{product.brand}</Text>}
           <Text style={styles.name}>{product.name}</Text>
 
@@ -113,12 +155,12 @@ export default function ProductDetailScreen({ route }) {
 
       <View style={[styles.bar, { paddingBottom: 12 + insets.bottom }]}>
         <TouchableOpacity style={[styles.btn, styles.cartBtn, outOfStock && styles.disabled]}
-          disabled={outOfStock} onPress={() => notYet('Add to Cart')}>
+          disabled={outOfStock || working} onPress={addToCart}>
           <Ionicons name="cart-outline" size={18} color={PRIMARY} />
           <Text style={[styles.btnText, { color: PRIMARY }]}>Add to Cart</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.btn, styles.buyBtn, outOfStock && styles.disabled]}
-          disabled={outOfStock} onPress={() => notYet('Buy Now')}>
+          disabled={outOfStock || working} onPress={buyNow}>
           <Text style={[styles.btnText, { color: '#fff' }]}>Buy Now</Text>
         </TouchableOpacity>
       </View>
@@ -133,6 +175,8 @@ const styles = StyleSheet.create({
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#d1d5db' },
   dotActive: { backgroundColor: PRIMARY, width: 18 },
   section: { backgroundColor: '#fff', marginTop: 8, padding: 16 },
+  wishlist: { flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'flex-end', marginBottom: 10 },
+  wishlistText: { color: PRIMARY, fontWeight: '700', fontSize: 13 },
   brand: { color: PRIMARY, fontWeight: '700', fontSize: 12, textTransform: 'uppercase' },
   name: { fontSize: 20, fontWeight: '700', color: '#111827', marginTop: 4 },
   ratingPill: { flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start',

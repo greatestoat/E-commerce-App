@@ -100,6 +100,15 @@ public class User {
 	@Column(nullable = false)
 	private String role = "USER"; // "USER" or "ADMIN"
 
+	@Column(length = 50000)
+	private String cartData = "[]";
+	@Column(length = 50000)
+	private String wishlistData = "[]";
+	@Column(length = 50000)
+	private String addressData = "[]";
+	@Column(length = 100000)
+	private String orderData = "[]";
+
 	public User() {
 	}
 
@@ -149,4 +158,12 @@ public class User {
 	public void setRole(String role) {
 		this.role = role;
 	}
+	public String getCartData() { return cartData; }
+	public void setCartData(String value) { this.cartData = value; }
+	public String getWishlistData() { return wishlistData; }
+	public void setWishlistData(String value) { this.wishlistData = value; }
+	public String getAddressData() { return addressData; }
+	public void setAddressData(String value) { this.addressData = value; }
+	public String getOrderData() { return orderData; }
+	public void setOrderData(String value) { this.orderData = value; }
 }

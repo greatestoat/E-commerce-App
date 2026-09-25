@@ -12,9 +12,10 @@ import HomeScreen from './src/screens/HomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
-import ProductListScreen from './src/screens/ProductListScreen';
 import AdminUploadScreen from './src/screens/AdminUploadScreen';
 import ProductDetailScreen from './src/screens/ProductDetailScreen';
+import AccountDataScreen from './src/screens/AccountDataScreen';
+import CheckoutScreen from './src/screens/CheckoutScreen';
 
 const TOKEN_KEY = 'auth_token';
 
@@ -50,7 +51,6 @@ function MainTabs({ user }) {
         tabBarIcon: ({ focused, color, size }) => {
           const icons = {
             Home: focused ? 'home' : 'home-outline',
-            Shop: focused ? 'storefront' : 'storefront-outline',
             Admin: focused ? 'add-circle' : 'add-circle-outline',
             Profile: focused ? 'person-circle' : 'person-circle-outline',
           };
@@ -59,7 +59,6 @@ function MainTabs({ user }) {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Shop" component={ProductListScreen} />
       {isAdmin && <Tab.Screen name="Admin" component={AdminUploadScreen} />}
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
@@ -122,6 +121,8 @@ export default function App() {
               component={ProductDetailScreen}
               options={{ title: 'Product details' }}
             />
+            <Stack.Screen name="AccountData" component={AccountDataScreen} options={{ title: 'Your account' }} />
+            <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ title: 'Checkout' }} />
           </Stack.Navigator>
         ) : (
           <AuthStack />

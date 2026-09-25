@@ -40,3 +40,44 @@ export async function createProduct({ image, gallery = [], ...fields }) {
 export async function deleteProduct(id) {
   await api.delete(`/products/${id}`);
 }
+
+export async function updateProduct(id, { image, gallery = [], ...fields }) {
+  const formData = new FormData();
+  Object.entries(fields).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && String(v).trim() !== '') formData.append(k, String(v));
+  });
+  if (image) await appendFile(formData, 'image', image);
+  for (const g of gallery) await appendFile(formData, 'images', g);
+  const { data } = await api.put(`/products/${id}`, formData, {
+    headers: { 'Content-Type': undefined }, timeout: 60000,
+  });
+  return data;
+}
+
+export async function fetchBanners() {
+  const { data } = await api.get('/banners');
+  return data;
+}
+
+export async function createBanner(image) {
+  const formData = new FormData();
+  await appendFile(formData, 'image', image);
+  const { data } = await api.post('/banners', formData, {
+    headers: { 'Content-Type': undefined }, timeout: 60000,
+  });
+  return data;
+}
+
+export async function deleteBanner(id) {
+  await api.delete(`/banners/${id}`);
+}
+
+export async function readAccount(section) {
+  const { data } = await api.get(`/account/${section}`);
+  return data;
+}
+
+export async function writeAccount(section, data) {
+  const { data: saved } = await api.put(`/account/${section}`, data);
+  return saved;
+}

@@ -11,18 +11,30 @@ import {
   View,
 } from 'react-native';
 import { useAuth } from '../../App';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+import { readAccount } from '../api/products';
 
 const MENU_ITEMS = [
-  { icon: 'bag-handle-outline', label: 'My Orders', color: '#3b82f6' },
-  { icon: 'heart-outline', label: 'Wishlist', color: '#ec4899' },
-  { icon: 'location-outline', label: 'Saved Addresses', color: '#10b981' },
+  { icon: 'cart-outline', label: 'My Cart', section: 'cart', color: '#3b82f6' },
+  { icon: 'bag-handle-outline', label: 'My Orders', section: 'orders', color: '#3b82f6' },
+  { icon: 'heart-outline', label: 'Wishlist', section: 'wishlist', color: '#ec4899' },
+  { icon: 'location-outline', label: 'Saved Addresses', section: 'addresses', color: '#10b981' },
   { icon: 'notifications-outline', label: 'Notifications', color: '#f59e0b' },
   { icon: 'shield-checkmark-outline', label: 'Privacy & Security', color: '#8b5cf6' },
   { icon: 'help-circle-outline', label: 'Help & Support', color: '#6b7280' },
 ];
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }) {
   const { user, handleLogout } = useAuth();
+  const [counts, setCounts] = useState({ cart: 0, wishlist: 0, orders: 0 });
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    Promise.all([readAccount('cart'), readAccount('wishlist'), readAccount('orders')]).then(([cart, wishlist, orders]) => {
+      if (active) setCounts({ cart: cart.length, wishlist: wishlist.length, orders: orders.length });
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []));
 
   const initials = user?.username
     ? user.username.slice(0, 2).toUpperCase()
@@ -74,8 +86,8 @@ export default function ProfileScreen() {
         {/* Stats Row */}
         <View style={styles.statsRow}>
           {[
-            { label: 'Orders', value: '0' },
-            { label: 'Wishlist', value: '0' },
+            { label: 'Orders', value: String(counts.orders) },
+            { label: 'Wishlist', value: String(counts.wishlist) },
             { label: 'Reviews', value: '0' },
           ].map(({ label, value }) => (
             <View key={label} style={styles.statBox}>
@@ -87,11 +99,14 @@ export default function ProfileScreen() {
 
         {/* Menu */}
         <View style={styles.menuCard}>
-          {MENU_ITEMS.map(({ icon, label, color }, idx) => (
+          {MENU_ITEMS.map(({ icon, label, color, section }, idx) => (
             <TouchableOpacity
               key={label}
               style={[styles.menuItem, idx < MENU_ITEMS.length - 1 && styles.menuBorder]}
               activeOpacity={0.7}
+              onPress={() => label === 'Notifications' || label === 'Privacy & Security' || label === 'Help & Support'
+                ? Alert.alert(label, 'This section is coming soon.')
+                : navigation.navigate('AccountData', { section })}
             >
               <View style={[styles.menuIcon, { backgroundColor: color + '18' }]}>
                 <Ionicons name={icon} size={20} color={color} />
@@ -245,4 +260,3 @@ const styles = StyleSheet.create({
 
   version: { textAlign: 'center', fontSize: 12, color: '#c0c7d0' },
 });
-

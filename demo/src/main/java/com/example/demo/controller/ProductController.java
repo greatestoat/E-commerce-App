@@ -129,4 +129,41 @@ public class ProductController {
         productRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PutMapping(value = "/{id}", consumes = "multipart/form-data")
+    public ResponseEntity<?> updateProduct(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable Long id,
+            @RequestParam String name,
+            @RequestParam(required = false) String description,
+            @RequestParam Double price,
+            @RequestParam(required = false) Double originalPrice,
+            @RequestParam String category,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) Integer stock,
+            @RequestParam(required = false) Double rating,
+            @RequestParam(required = false) String highlights,
+            @RequestParam(required = false) String specifications,
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            @RequestParam(value = "images", required = false) List<MultipartFile> images) throws IOException {
+        ResponseEntity<?> denied = requireAdmin(authHeader);
+        if (denied != null) return denied;
+        Product product = productRepository.findById(id).orElse(null);
+        if (product == null) return ResponseEntity.notFound().build();
+        product.setName(name);
+        product.setDescription(description);
+        product.setPrice(price);
+        product.setOriginalPrice(originalPrice);
+        product.setCategory(category);
+        product.setBrand(brand);
+        product.setStock(stock);
+        product.setRating(rating);
+        product.setHighlights(highlights);
+        product.setSpecifications(specifications);
+        if (image != null && !image.isEmpty()) product.setImageUrl(saveImage(image));
+        if (images != null) {
+            for (MultipartFile f : images) if (f != null && !f.isEmpty()) product.getImages().add(saveImage(f));
+        }
+        return ResponseEntity.ok(productRepository.save(product));
+    }
 }

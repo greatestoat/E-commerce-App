@@ -1,17 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import {
-  ActivityIndicator, RefreshControl, SafeAreaView, ScrollView, StyleSheet,
+  ActivityIndicator, Dimensions, Image, RefreshControl, SafeAreaView, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useAuth } from '../../App';
 import { extractErrorMessage } from '../api/auth';
-import { fetchProducts } from '../api/products';
+import { fetchBanners, fetchProducts } from '../api/products';
+import { HOST } from '../api/client';
 import ProductCard from '../components/ProductCard';
 import { CATEGORIES, PRIMARY } from '../constants';
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ navigation, route }) {
   const { user } = useAuth();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,11 +20,17 @@ export default function HomeScreen({ navigation }) {
   const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState('All');
+  const [banners, setBanners] = useState([]);
+  const [showOrderSuccess, setShowOrderSuccess] = useState(false);
+  const carousel = useRef(null);
+  const bannerIndex = useRef(0);
+  const screenWidth = Dimensions.get('window').width;
 
   const load = useCallback(async () => {
     try {
       setError(null);
       setProducts(await fetchProducts());
+      setBanners(await fetchBanners());
     } catch (e) {
       setError(extractErrorMessage(e));
     } finally {
@@ -32,6 +39,20 @@ export default function HomeScreen({ navigation }) {
     }
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
+  useEffect(() => {
+    if (route.params?.orderSuccess) {
+      setShowOrderSuccess(true);
+      navigation.setParams({ orderSuccess: false });
+    }
+  }, [route.params?.orderSuccess, navigation]);
+  useEffect(() => {
+    if (banners.length < 2) return undefined;
+    const timer = setInterval(() => {
+      bannerIndex.current = (bannerIndex.current + 1) % banners.length;
+      carousel.current?.scrollTo({ x: bannerIndex.current * (screenWidth - 32), animated: true });
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [banners.length, screenWidth]);
 
   const open = (p) => navigation.navigate('ProductDetail', { id: p.id, product: p });
 
@@ -77,6 +98,27 @@ export default function HomeScreen({ navigation }) {
             )}
           </View>
         </View>
+
+        {showOrderSuccess && <View style={styles.successCard}>
+          <View style={styles.successIcon}><Ionicons name="checkmark" size={20} color="#fff" /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.successTitle}>Order successfully placed!</Text>
+            <Text style={styles.successSub}>Thanks for shopping with us.</Text>
+          </View>
+          <TouchableOpacity onPress={() => setShowOrderSuccess(false)} style={styles.continueBtn}>
+            <Text style={styles.continueText}>Continue shopping</Text>
+          </TouchableOpacity>
+        </View>}
+
+        {banners.length > 0 && <View style={styles.carouselWrap}>
+          <ScrollView ref={carousel} horizontal pagingEnabled showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e) => { bannerIndex.current = Math.round(e.nativeEvent.contentOffset.x / (screenWidth - 32)); }}>
+            {banners.map((item) => <Image key={item.id} source={{ uri: `${HOST}${item.imageUrl}` }}
+              style={[styles.bannerImage, { width: screenWidth - 32 }]} resizeMode="cover" />)}
+          </ScrollView>
+          {banners.length > 1 && <View style={styles.bannerDots}>{banners.map((b, i) =>
+            <View key={b.id} style={[styles.bannerDot, i === activeBanner && styles.bannerDotActive]} />)}</View>}
+        </View>}
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
           {['All', ...categories].map((c) => (
@@ -129,6 +171,19 @@ export default function HomeScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#f0f4ff' },
+  carouselWrap: { marginHorizontal: 16, marginTop: 2, marginBottom: 4, overflow: 'hidden', borderRadius: 18,
+    backgroundColor: '#dbeafe', elevation: 3 },
+  successCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 14,
+    padding: 12, borderRadius: 16, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#bbf7d0' },
+  successIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#16a34a', alignItems: 'center', justifyContent: 'center' },
+  successTitle: { color: '#166534', fontWeight: '800', fontSize: 14 },
+  successSub: { color: '#4b7b5b', fontSize: 12, marginTop: 2 },
+  continueBtn: { backgroundColor: '#16a34a', borderRadius: 9, paddingHorizontal: 11, paddingVertical: 9 },
+  continueText: { color: '#fff', fontWeight: '700', fontSize: 11 },
+  bannerImage: { height: 170, borderRadius: 18 },
+  bannerDots: { position: 'absolute', bottom: 10, alignSelf: 'center', flexDirection: 'row', gap: 6 },
+  bannerDot: { width: 7, height: 7, borderRadius: 5, backgroundColor: 'rgba(255,255,255,.65)' },
+  bannerDotActive: { width: 18, backgroundColor: '#fff' },
   banner: { backgroundColor: PRIMARY, padding: 20, paddingTop: 32,
     borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   greeting: { fontSize: 22, fontWeight: '800', color: '#fff' },
